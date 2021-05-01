@@ -1,4 +1,4 @@
-name := """spez-prog-project"""
+name := """stock-watchlist"""
 organization := "com.nassimuhrmann"
 
 version := "1.0-SNAPSHOT"
