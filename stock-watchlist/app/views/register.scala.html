@@ -1,0 +1,57 @@
+@(loginForm: Form[Register])(implicit request: MessagesRequestHeader, flash: Flash)
+
+@main("Stock Watchlist - Login") {
+  <h1 style="text-align:center; margin-bottom: -0.5em; margin-top: 0em; padding-top: 0.5em; padding-bottom: -5em">Welcome to Your Stock Watchlist!</h1>
+
+@*  <h3>Please choose a unique username and a password</h3>*@
+
+
+@*  @helper.form(action = routes.AuthenticationController.validateRegisterForm) {*@
+@*    @helper.CSRF.formField*@
+@*    @helper.inputText(loginForm("Username"))*@
+@*    @helper.inputPassword(loginForm("Password"))*@
+@*    @helper.inputPassword(loginForm("Confirm Password"))*@
+@*    <div>*@
+@*      <button type="submit">Login</button>*@
+@*    </div>*@
+
+
+   @* }*@
+
+@*  Source of bootstrap snippet: https://bootsnipp.com/snippets/dldxB*@
+  <div class="wrapper fadeInDown">
+    <div id="formContent">
+
+        <!-- Icon -->
+      <div class="fadeIn first">
+        <img src="https://cdn.borlabs.io/wp-content/uploads/2019/09/blog-wp-login.png" id="icon" alt="User Icon" />
+      </div>
+
+@*      <form method="POST" action="@routes.AuthenticationController.validateLogin()">*@
+@*        @helper.CSRF.formField*@
+@*        *@@*        <span>Username:</span>*@
+@*        <input type="text" id="login" class="fadeIn second" placeholder="login" name="username"></input><br>*@
+@*        *@@*        <span>Password:</span>*@
+@*        <input type="password" id="password" class="fadeIn third" placeholder="password" name="password"></input><br>*@
+@*        <input type="submit" class="fadeIn fourth" value="Log In"></input>*@
+@*        <hr>*@
+@*      </form>*@
+      @helper.form(action = routes.AuthenticationDBController.validateRegisterForm) {
+        @helper.CSRF.formField
+        @helper.inputText(loginForm("Username"), Symbol("placeholder") -> "username")
+        @helper.inputPassword(loginForm("Password"), Symbol("placeholder") -> "password")
+        @helper.inputPassword(loginForm("Confirm Password"),  Symbol("placeholder") -> "confirm password")
+      <div>
+        <input type="submit" class="fadeIn fourth" value="Register"></input>
+      </div>
+      }
+
+      <div id="formFooter">
+        <a class="underlineHover" href="@routes.HomeController.index()">Already registered?</a>
+      </div>
+
+    </div>
+  </div>
+
+
+}
