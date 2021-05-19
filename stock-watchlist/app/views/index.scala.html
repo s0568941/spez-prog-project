@@ -1,5 +1,17 @@
-@()
+@(user: String)(implicit request: MessagesRequestHeader, flash: Flash)
 
-@main("Welcome to Play") {
+@main("Stock Watchlist - Login") {
   <h1>Welcome to Your Stock Watchlist!</h1>
+
+  <h3>Hello @user!</h3>
+  <a href="@routes.AuthenticationController.logout()">Logout</a>
+@*  <form method="POST" action="@routes.AuthenticationController.validateLogin()">*@
+@*    @helper.CSRF.formField*@
+@*    <span>Username:</span>*@
+@*    <input type="text" name="username"></input><br>*@
+@*    <span>Password:</span>*@
+@*    <input type="password" name="password"></input><br>*@
+@*    <input type="submit"></input>*@
+@*    <hr>*@
+@*  </form>*@
 }
