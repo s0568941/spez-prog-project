@@ -1,17 +1,122 @@
-@(user: String)(implicit request: MessagesRequestHeader, flash: Flash)
+@(registerForm: Form[Register], user: String = "")(implicit flash: Flash, request: MessagesRequestHeader)
 
-@main("Stock Watchlist - Login") {
-  <h1>Welcome to Your Stock Watchlist!</h1>
+@main("Stock Watchlist") {
 
-  <h3>Hello @user!</h3>
-  <a href="@routes.AuthenticationController.logout()">Logout</a>
-@*  <form method="POST" action="@routes.AuthenticationController.validateLogin()">*@
-@*    @helper.CSRF.formField*@
-@*    <span>Username:</span>*@
-@*    <input type="text" name="username"></input><br>*@
-@*    <span>Password:</span>*@
-@*    <input type="password" name="password"></input><br>*@
-@*    <input type="submit"></input>*@
-@*    <hr>*@
-@*  </form>*@
+  @*  <div id="ajax-content">Ajax loading..</div>*@
+
+
+
+  <div style="height:100%;" id="login-area">
+
+    <div style="text-align:center; margin-bottom: -5em; margin-top: 1em; padding-top: 2em; padding-bottom: -5em">
+      <h1>Welcome to Your Stock Watchlist!</h1>
+    </div>
+
+    @*Begin of Login Form*@
+    @*  Source of bootstrap snippet: https://bootsnipp.com/snippets/dldxB*@
+    <div class="wrapper fadeInDown">
+      <div id="formContent">
+
+          <!-- Icon -->
+        <div class="fadeIn first">
+          <img src="https://cdn.borlabs.io/wp-content/uploads/2019/09/blog-wp-login.png" id="icon" alt="User Icon" />
+        </div>
+
+          <!-- Login Form -->
+        <div>
+          @*        <span>Username:</span>*@
+          <input type="text" id="login" class="fadeIn second login-input" placeholder="username" name="username"></input><br>
+          @*        <span>Password:</span>*@
+          <input type="password" id="password" class="fadeIn third login-input" placeholder="password" name="password"></input><br>
+          <input id="login-btn" onclick="login()" type="submit" class="fadeIn fourth" value="Log In"></input>
+        </div>
+
+        <div id="formFooter">
+          <a class="underlineHover" onclick="navToRegister()" href="javascript:;">Not registered yet?</a>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+
+  <div style="display:none;" id="register-area">
+
+    <div style="text-align:center; margin-bottom: -2em; margin-top: 1em; padding-top: 2em; padding-bottom: -5em">
+      <h1>Welcome to Your Stock Watchlist!</h1>
+    </div>
+
+    @*  Source of bootstrap snippet: https://bootsnipp.com/snippets/dldxB*@
+    <div class="wrapper fadeInDown">
+      <div id="formContent">
+
+          <!-- Icon -->
+        <div class="fadeIn first">
+          <img src="https://cdn.borlabs.io/wp-content/uploads/2019/09/blog-wp-login.png" id="icon" alt="User Icon" />
+        </div>
+        <div method="POST" action="@routes.AuthenticationDBController.validateLogin">
+
+          @helper.form(action = routes.AuthenticationDBController.validateRegisterForm) {
+            @helper.CSRF.formField
+            @helper.inputText(registerForm("Username"), Symbol("id") -> "register-user", Symbol("class") -> "register-input",
+              Symbol("placeholder") -> "username")
+            @helper.inputPassword(registerForm("Password"), Symbol("id") -> "register-pw", Symbol("class") -> "register-input",
+              Symbol("placeholder") -> "password")
+            @helper.inputPassword(registerForm("Confirm Password"), Symbol("id") -> "register-pw-confirm", Symbol("class") -> "register-input",
+              Symbol("placeholder") -> "confirm password")
+          }
+          <hr>
+        </div>
+
+        <div>
+          <input id="register-btn" onclick="register()" type="submit" class="fadeIn fourth" value="Register"></input>
+        </div>
+
+        <div id="formFooter">
+          <a class="underlineHover" onclick="navToLogin()" href="javascript:;">Already registered?</a>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+
+  <div style="display:none" id="welcome-area">
+    <h1>Welcome to Your Stock Watchlist!</h1>
+
+    <h3>Hello @request.session.get("username")!</h3>
+    <a href="@routes.AuthenticationController.logout">Logout</a>
+  </div>
+
+
+
+
+  <input type="hidden" id="indexRoute" value="@routes.HomeController.index">
+  @*  Welcome / login*@
+  <input type="hidden" id="welcomeRoute" value="@routes.AuthenticationController.index()">
+  <input type="hidden" id="validateLoginRoute" value="@routes.AuthenticationDBController.validateLogin()">
+  <input type="hidden" id="validateRegisterRoute" value="@routes.AuthenticationDBController.validateRegisterForm">
+  <input type="hidden" id="authStatusRoute" value="@routes.AuthenticationController.authStatus">
+
+  @*  <input type="hidden" id="validateRoute" value="@routes.TaskList2.validate()">*@
+  @*  <input type="hidden" id="createRoute" value="@routes.TaskList2.createUser()">*@
+  @*  <input type="hidden" id="deleteRoute" value="@routes.TaskList2.delete()">*@
+  @*  <input type="hidden" id="addRoute" value="@routes.TaskList2.addTask()">*@
+  <input type="hidden" id="csrfToken" value="@helper.CSRF.getToken.value">
+
+
+
+
+
+  <script src="@routes.Assets.versioned("javascripts/ajax.js")" type="text/javascript"></script>
+
+  @*  <form method="POST" action="@routes.AuthenticationController.validateLogin()">*@
+  @*    @helper.CSRF.formField*@
+  @*    <span>Username:</span>*@
+  @*    <input type="text" name="username"></input><br>*@
+  @*    <span>Password:</span>*@
+  @*    <input type="password" name="password"></input><br>*@
+  @*    <input type="submit"></input>*@
+  @*    <hr>*@
+  @*  </form>*@
 }

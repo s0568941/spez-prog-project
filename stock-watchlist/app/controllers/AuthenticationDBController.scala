@@ -1,9 +1,11 @@
 package controllers
 
-import models.{AuthenticationDBModel, AuthenticationModel}
+import models.{AuthenticationDBModel, LoginData, RegisterData}
 import play.api.data.Form
 import play.api.data.Forms.{mapping, text}
 import play.api.db.slick.{DatabaseConfigProvider, HasDatabaseConfigProvider}
+import play.api.libs.json.OFormat.oFormatFromReadsAndOWrites
+import play.api.libs.json.{JsError, JsSuccess, Json, Writes}
 import play.api.mvc._
 import slick.jdbc.JdbcProfile
 
@@ -13,63 +15,61 @@ import scala.concurrent.{ExecutionContext, Future}
 
 
 @Singleton
-class AuthenticationDBController @Inject()(protected val dbConfigProvider: DatabaseConfigProvider, cc: ControllerComponents)(
+class AuthenticationDBController @Inject()(protected val dbConfigProvider: DatabaseConfigProvider, cc: MessagesControllerComponents)(
   implicit ec: ExecutionContext
-) extends AbstractController(cc)
+) extends MessagesAbstractController(cc)
   with HasDatabaseConfigProvider[JdbcProfile] {
   val registerForm = Form(mapping(
-    "Username" -> text(3, 20),
-    "Password" -> text(5),
-    "Confirm Password" -> text(5))(Register.apply)(Register.unapply))
+    "username" -> text(3, 20),
+    "password" -> text(5),
+    "confPassword" -> text(5))(Register.apply)(Register.unapply))
   private val model = new AuthenticationDBModel(db)
 
-  // TODO: Workaround - only for DB milestone 8.5.21
-  def validateRegisterForm() = Action.async { implicit request: Request[AnyContent] =>
+  implicit val loginDataReads = Json.reads[LoginData]
+
+  implicit val registerDataReads = Json.reads[RegisterData]
+  implicit val registerDataWrites = Json.writes[RegisterData]
+  implicit val registerFormWrites = Json.writes[Register]
+
+  def validateRegisterForm() = Action.async { implicit request: MessagesRequest[AnyContent] =>
     registerForm.bindFromRequest.fold(
-      formWithErrors => Future.successful(Redirect(routes.AuthenticationController.register)),
+      formWithErrors => {
+        val fieldRequiredErrors = formWithErrors.data.filter ( (key) =>
+          key._2.equals("")
+          )
+        Future.successful(Ok(Json.toJson(Json.obj(
+          "registerSuccess" -> false,
+          "fieldRequiredError" -> fieldRequiredErrors
+        ))).withSession("csrfToken" -> play.filters.csrf.CSRF.getToken.get.value))
+      },
       registerData => {
         if (registerData.password != registerData.confirmPassword) {
-          // TODO: flashing error - passwords must match
-          Future.successful(Redirect(routes.AuthenticationController.register()).flashing("error" -> "The passwords you entered do not match."))
+          // https://www.nappin.com/blog/mixing-play-forms-and-javascript/
+          // https://blog.knoldus.com/play-framework-2-0-ajax-calling-using-javascript-routing-in-scala/
+          // flash does not work for ajax applications: https://www.playframework.com/documentation/2.8.x/ScalaSessionFlash#Flash-scope
+          Future.successful(Ok(Json.toJson(Json.obj(
+            "registerSuccess" -> false,
+            "passwordMatchError" -> true
+          ))).withSession("csrfToken" -> play.filters.csrf.CSRF.getToken.get.value))
         } else {
-//          if (AuthenticationModel.registerUser(registerData.username, registerData.password)) {
-            model.registerUser(registerData.username, registerData.password).map { userRegistered =>
+          model.registerUser(registerData.username, registerData.password).map { userRegistered =>
             // user is registered and returns to login
-              if (userRegistered) {
-                (Redirect(routes.HomeController.index).flashing("success" -> "Registration successful."))
-              } else {
-                // user is not registered and returns to registration
-                (Redirect(routes.AuthenticationController.register()).flashing("error" -> "The username you entered is already taken."))
-              }
-            //.withSession("username" -> username)
+            if (userRegistered) {
+              Ok(Json.toJson(Json.obj(
+                "registerSuccess" -> true
+              ))).withSession("csrfToken" -> play.filters.csrf.CSRF.getToken.get.value)
+            } else {
+              // user is not registered and returns to registration
+              Ok(Json.toJson(Json.obj(
+                "registerSuccess" -> false,
+                "userExists" -> true
+              ))).withSession("csrfToken" -> play.filters.csrf.CSRF.getToken.get.value)
+            }
           }
         }
       }
     )
   }
-//  def validateRegisterForm() = Action.async { implicit request: Request[AnyContent] =>
-//    registerForm.bindFromRequest.fold(
-//      // binding failure, you retrieve the form containing errors:
-//      formWithErrors => Future.successful(BadRequest(views.html.register(formWithErrors))),
-//      /* binding success, you get the actual value. */
-//      registerData => {
-//        if (registerData.password != registerData.confirmPassword) {
-//          // TODO: flashing error - passwords must match
-//          Future.successful(Redirect(routes.AuthenticationController.register()).flashing("error" -> "The passwords you entered do not match."))
-//        } else {
-//          if (AuthenticationModel.registerUser(registerData.username, registerData.password)) {
-//            //          if (model.registerUser(registerData.username, registerData.password)) {
-//            // user is registered and returns to login
-//            Future.successful(Redirect(routes.HomeController.index).flashing("success" -> "Registration successful."))
-//            //.withSession("username" -> username)
-//          } else {
-//            // user is not registered and returns to registration
-//            Future.successful(Redirect(routes.AuthenticationController.register()).flashing("error" -> "The username you entered is already taken."))
-//          }
-//        }
-//      }
-//    )
-//  }
 
   /**
    * checks login data of user and grants access if user is registered
@@ -77,23 +77,34 @@ class AuthenticationDBController @Inject()(protected val dbConfigProvider: Datab
    * @return
    */
   def validateLogin() = Action.async { implicit request: Request[AnyContent] =>
-    val values = request.body.asFormUrlEncoded
+    val values = request.body.asJson
     values.map(vals => {
-      val username = vals("username").head
-      val password = vals("password").head
-      model.validateLogin(username, password).map(validUser =>
-        if (validUser) {
-          // user is logged in and will be redirected to index ("Welcome user")
-          Redirect(routes.AuthenticationController.index).withSession("username" -> username)
-
-        } else {
-          // user is not logged in and will be redirected to login
-//          Redirect(routes.HomeController.index).flashing("error" -> "The username or password you entered is not valid.")
-          Redirect(routes.HomeController.index).withSession("error" -> "The username or password you entered is not valid.")
-
+      Json.fromJson[LoginData](vals) match {
+        case JsSuccess(loginData, path) => {
+          model.validateLogin(loginData.username, loginData.password).map(validUser =>
+            if (validUser) {
+              // user is logged in and will be redirected to index ("Welcome user")
+              // #########
+              Ok(Json.toJson(Json.obj(
+                "loginSuccess" -> true
+              )))
+                .withSession("username" -> loginData.username,
+                "csrfToken" -> play.filters.csrf.CSRF.getToken.get.value)
+              // #########
+            } else {
+              // user is not logged in and will be redirected to login
+              Ok(Json.toJson(Json.obj(
+                "loginSuccess" -> false,
+                "error" -> "The username or password you entered is not valid."
+              )))
+                .withSession("csrfToken" -> play.filters.csrf.CSRF.getToken.get.value)
+            }
+          )
         }
-      )
-      }).getOrElse(Future.successful(Redirect(routes.HomeController.index)))
+        case e @ JsError(_) => Future.successful(Redirect(routes.AuthenticationController.index()))
+      }
+    }).getOrElse(Future.successful(Ok(Json.toJson(Json.obj("error" -> "Validation failed. Please retry.")))
+    .withSession("csrfToken" -> play.filters.csrf.CSRF.getToken.get.value)))
   }
 
 }
