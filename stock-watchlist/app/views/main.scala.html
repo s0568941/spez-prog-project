@@ -9,10 +9,10 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
-        @* Here's where we render the page title `String`. *@
         <title>@title</title>
         <link rel="stylesheet" media="screen" href="@routes.Assets.versioned("stylesheets/main.css")">
         <link rel="shortcut icon" type="image/png" href="@routes.Assets.versioned("images/favicon.png")">
+        <link rel="stylesheet" src="@routes.Assets.versioned("javascripts/lib/font-awesome/css/all.min.css")"></link>
 
         <!-- bootstrap -->
         <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
@@ -20,6 +20,16 @@
         <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
         <!-- bootstrap -->
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+        <!-- React -->
+        <script src="https://unpkg.com/react@@17/umd/react.development.js"></script>
+        <script src="https://unpkg.com/react-dom@@17/umd/react-dom.development.js"></script>
+
+        <script src="https://unpkg.com/@@babel/standalone/babel.min.js"></script>
+
+        <script
+        src="https://kit.fontawesome.com/fc31dedf63.js"
+        crossorigin="anonymous"
+        ></script>
 
     </head>
     <body>

@@ -12,7 +12,6 @@ import play.api.mvc._
  */
 @Singleton
 class HomeController @Inject()(val controllerComponents: MessagesControllerComponents) extends MessagesBaseController {
-  // TODO: make it a constant
   val registerForm = Form(mapping(
     "Username" -> text(3, 20),
     "Password" -> text(5),
@@ -25,11 +24,12 @@ class HomeController @Inject()(val controllerComponents: MessagesControllerCompo
    * will be called when the application receives a `GET` request with
    * a path of `/`.
    */
+
   def index() = Action { implicit request: MessagesRequest[AnyContent] =>
-    val user = request.session.get("username")
-    user.map(u => {
-      Ok(views.html.index(registerForm, u))
-    }).getOrElse(Ok(views.html.index(registerForm)))
-//    Ok(views.html.index3(registerForm))
+//    val user = request.session.get("username")
+//    user.map(u => {
+//      Ok(views.html.index(registerForm, u))
+//    }).getOrElse(Ok(views.html.index(registerForm)))
+    Ok(views.html.index(registerForm))
   }
 }

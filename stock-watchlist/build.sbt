@@ -27,6 +27,8 @@ libraryDependencies ++= Seq(
 
 libraryDependencies += "com.typesafe.play" %% "play-json" % "2.8.1"
 
+libraryDependencies += "com.github.tototoshi" %% "scala-csv" % "1.3.8"
+
 // Adds additional packages into Twirl
 //TwirlKeys.templateImports += "com.nassimuhrmann.controllers._"
 
