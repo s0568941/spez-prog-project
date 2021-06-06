@@ -1,9 +1,11 @@
 package controllers
 
-import models.{AuthenticationDBModel, AuthenticationModel}
+import models.{AuthenticationDBModel, LoginData, NewsItem, RegisterData, StocksItem}
 import play.api.data.Form
 import play.api.data.Forms.{mapping, text}
 import play.api.db.slick.{DatabaseConfigProvider, HasDatabaseConfigProvider}
+import play.api.libs.json.OFormat.oFormatFromReadsAndOWrites
+import play.api.libs.json.{JsArray, JsError, JsSuccess, JsValue, Json, Writes}
 import play.api.mvc._
 import slick.jdbc.JdbcProfile
 
@@ -13,63 +15,74 @@ import scala.concurrent.{ExecutionContext, Future}
 
 
 @Singleton
-class AuthenticationDBController @Inject()(protected val dbConfigProvider: DatabaseConfigProvider, cc: ControllerComponents)(
+class AuthenticationDBController @Inject()(protected val dbConfigProvider: DatabaseConfigProvider, cc: MessagesControllerComponents)(
   implicit ec: ExecutionContext
-) extends AbstractController(cc)
+) extends MessagesAbstractController(cc)
   with HasDatabaseConfigProvider[JdbcProfile] {
+  val USERNAME_MIN_LEN = 3
+  val USERNAME_MAX_LEN = 20
+  val PASSWORD_MIN_LEN = 5
   val registerForm = Form(mapping(
-    "Username" -> text(3, 20),
-    "Password" -> text(5),
-    "Confirm Password" -> text(5))(Register.apply)(Register.unapply))
+    "username" -> text(USERNAME_MIN_LEN, USERNAME_MAX_LEN),
+    "password" -> text(PASSWORD_MIN_LEN),
+    "confPassword" -> text(PASSWORD_MIN_LEN))(Register.apply)(Register.unapply))
   private val model = new AuthenticationDBModel(db)
 
-  // TODO: Workaround - only for DB milestone 8.5.21
-  def validateRegisterForm() = Action.async { implicit request: Request[AnyContent] =>
+  implicit val loginDataReads = Json.reads[LoginData]
+
+  implicit val registerDataReads = Json.reads[RegisterData]
+  implicit val registerDataWrites = Json.writes[RegisterData]
+  implicit val registerFormWrites = Json.writes[Register]
+  implicit val stockRowWrites = Json.writes[StocksItem]
+  implicit val newsRowWrites = Json.writes[NewsItem]
+
+  def validateRegisterForm() = Action.async { implicit request: MessagesRequest[AnyContent] =>
     registerForm.bindFromRequest.fold(
-      formWithErrors => Future.successful(Redirect(routes.AuthenticationController.register)),
+      formWithErrors => {
+        println(formWithErrors.errors)
+        val fieldLengthErrors = formWithErrors.errors.map( e =>
+          Json.obj(
+            "field" -> e.key,
+            "message" -> e.format
+          )
+        )
+        val fieldRequiredErrors = formWithErrors.data.filter ( key =>
+          key._2.equals("")
+          )
+        Future.successful(Ok(Json.toJson(Json.obj(
+          "registerSuccess" -> false,
+          "fieldRequiredError" -> fieldRequiredErrors,
+          "fieldLengthError" -> fieldLengthErrors
+        ))).withSession("csrfToken" -> play.filters.csrf.CSRF.getToken.get.value))
+      },
       registerData => {
         if (registerData.password != registerData.confirmPassword) {
-          // TODO: flashing error - passwords must match
-          Future.successful(Redirect(routes.AuthenticationController.register()).flashing("error" -> "The passwords you entered do not match."))
+          // https://www.nappin.com/blog/mixing-play-forms-and-javascript/
+          // https://blog.knoldus.com/play-framework-2-0-ajax-calling-using-javascript-routing-in-scala/
+          // flash does not work for ajax applications: https://www.playframework.com/documentation/2.8.x/ScalaSessionFlash#Flash-scope
+          Future.successful(Ok(Json.toJson(Json.obj(
+            "registerSuccess" -> false,
+            "passwordMatchError" -> true
+          ))).withSession("csrfToken" -> play.filters.csrf.CSRF.getToken.get.value))
         } else {
-//          if (AuthenticationModel.registerUser(registerData.username, registerData.password)) {
-            model.registerUser(registerData.username, registerData.password).map { userRegistered =>
+          model.registerUser(registerData.username, registerData.password).map { userRegistered =>
             // user is registered and returns to login
-              if (userRegistered) {
-                (Redirect(routes.HomeController.index).flashing("success" -> "Registration successful."))
-              } else {
-                // user is not registered and returns to registration
-                (Redirect(routes.AuthenticationController.register()).flashing("error" -> "The username you entered is already taken."))
-              }
-            //.withSession("username" -> username)
+            if (userRegistered) {
+              Ok(Json.toJson(Json.obj(
+                "registerSuccess" -> true
+              ))).withSession("csrfToken" -> play.filters.csrf.CSRF.getToken.get.value)
+            } else {
+              // user is not registered and returns to registration
+              Ok(Json.toJson(Json.obj(
+                "registerSuccess" -> false,
+                "userExists" -> true
+              ))).withSession("csrfToken" -> play.filters.csrf.CSRF.getToken.get.value)
+            }
           }
         }
       }
     )
   }
-//  def validateRegisterForm() = Action.async { implicit request: Request[AnyContent] =>
-//    registerForm.bindFromRequest.fold(
-//      // binding failure, you retrieve the form containing errors:
-//      formWithErrors => Future.successful(BadRequest(views.html.register(formWithErrors))),
-//      /* binding success, you get the actual value. */
-//      registerData => {
-//        if (registerData.password != registerData.confirmPassword) {
-//          // TODO: flashing error - passwords must match
-//          Future.successful(Redirect(routes.AuthenticationController.register()).flashing("error" -> "The passwords you entered do not match."))
-//        } else {
-//          if (AuthenticationModel.registerUser(registerData.username, registerData.password)) {
-//            //          if (model.registerUser(registerData.username, registerData.password)) {
-//            // user is registered and returns to login
-//            Future.successful(Redirect(routes.HomeController.index).flashing("success" -> "Registration successful."))
-//            //.withSession("username" -> username)
-//          } else {
-//            // user is not registered and returns to registration
-//            Future.successful(Redirect(routes.AuthenticationController.register()).flashing("error" -> "The username you entered is already taken."))
-//          }
-//        }
-//      }
-//    )
-//  }
 
   /**
    * checks login data of user and grants access if user is registered
@@ -77,23 +90,133 @@ class AuthenticationDBController @Inject()(protected val dbConfigProvider: Datab
    * @return
    */
   def validateLogin() = Action.async { implicit request: Request[AnyContent] =>
-    val values = request.body.asFormUrlEncoded
+    val values = request.body.asJson
     values.map(vals => {
-      val username = vals("username").head
-      val password = vals("password").head
-      model.validateLogin(username, password).map(validUser =>
-        if (validUser) {
-          // user is logged in and will be redirected to index ("Welcome user")
-          Redirect(routes.AuthenticationController.index).withSession("username" -> username)
+      Json.fromJson[LoginData](vals) match {
+        case JsSuccess(loginData, path) => {
+          model.validateLogin(loginData.username, loginData.password).map(validUser =>
+            validUser match {
+              case Some(userId) =>
+                // user is logged in and will be redirected to index ("Welcome user")
+                // #########
+                Ok(Json.toJson(Json.obj(
+                  "loginSuccess" -> true
+                )))
+                  .withSession("username" -> loginData.username,
+                  "userId" -> userId.toString,
+                  "csrfToken" -> play.filters.csrf.CSRF.getToken.get.value)
 
-        } else {
-          // user is not logged in and will be redirected to login
-//          Redirect(routes.HomeController.index).flashing("error" -> "The username or password you entered is not valid.")
-          Redirect(routes.HomeController.index).withSession("error" -> "The username or password you entered is not valid.")
-
+              // #########
+              case None =>
+                Ok(Json.toJson(Json.obj(
+                  "loginSuccess" -> false,
+                  "error" -> "The username or password you entered is not valid."
+                )))
+                  .withSession("csrfToken" -> play.filters.csrf.CSRF.getToken.get.value)
+            }
+          )
         }
-      )
-      }).getOrElse(Future.successful(Redirect(routes.HomeController.index)))
+        case e @ JsError(_) => Future.successful(Redirect(routes.AuthenticationController.index()))
+      }
+    }).getOrElse(Future.successful(Ok(Json.toJson(Json.obj("error" -> "Validation failed. Please retry.")))
+    .withSession("csrfToken" -> play.filters.csrf.CSRF.getToken.get.value)))
+  }
+
+  /**
+   * Loads all available stocks for the app from the database as a json string
+   * @return
+   */
+  def loadAppData() = Action.async { implicit request: Request[AnyContent] =>
+    // stocks is an array
+    model.getStocks().map {
+      stocks =>
+        Ok(Json.toJson(Json.obj("loadSuccess" -> true, "stocks" -> stocks)))
+    }
+  }
+
+  def loadWatchlist() = Action.async { implicit request: Request[AnyContent] =>
+    val user = request.session.get("username")
+    val username = user.map { userName => userName }
+    model.getStocks(username.getOrElse("")).map {
+      stocks =>
+        Ok(Json.toJson(Json.obj("loadSuccess" -> true, "stocks" -> stocks)))
+    }
+  }
+
+  def receiveTodaysNews() = Action.async { implicit request: Request[AnyContent] =>
+      model.getTodaysNews().map {
+        news =>
+          if (news.isEmpty) {
+            Ok(Json.toJson(Seq.empty[String]))
+          } else {
+            Ok(Json.toJson(news))
+          }
+      }
+  }
+
+  def saveTodaysNews() = Action.async { implicit request: MessagesRequest[AnyContent] =>
+    val optUserId = request.session.get("userId")
+    val values = request.body.asJson
+    optUserId.map{
+      validUser =>
+        values.map(vals => {
+          Json.fromJson[JsValue](vals) match {
+            case JsSuccess(news, path) => {
+              Future.successful(Ok(Json.toJson(Json.obj("error" -> "News API does not allow fetching from heroku"))))
+//              model.saveTodaysNews(news.toString).map(insertCount =>
+//                Ok(Json.toJson(insertCount > 0))
+//              )
+            }
+            case e @ JsError(err) =>
+              Future.successful(Ok(Json.toJson(JsError.toJson(err))))
+          }
+        }).getOrElse(Future.successful(Ok(Json.toJson(Json.obj("error" -> "Adding news failed.")))))
+    }.getOrElse(Future.successful(Ok(Json.toJson(Json.obj("error" -> "Adding news failed.")))))
+  }
+
+  /**
+   * Adds requested stock to watchlist of user by determining the user ID
+   * @return
+   */
+  def addStockToWatchlist() = Action.async { implicit request: MessagesRequest[AnyContent] =>
+    val optUserId = request.session.get("userId")
+    val values = request.body.asJson
+    val id = optUserId.map(userId => userId.toInt)
+    optUserId.map {
+      userId =>
+        values.map(vals => {
+          Json.fromJson[String](vals) match {
+            case JsSuccess(stock, path) => {
+              model.addStockToWatchlist(stock, id.getOrElse(-1))
+                .map(insertCount =>
+                  Ok(Json.toJson(insertCount > 0))
+                )
+            }
+            case e @ JsError(_) => Future.successful(Redirect(routes.AuthenticationController.index()))
+          }
+        }
+        ).getOrElse(Future.successful(Ok(Json.toJson(Json.obj("error" -> "Adding stock to watchlist failed.")))))
+    }.getOrElse(Future.successful(Ok(Json.toJson(Json.obj("error" -> "User not logged in.")))))
+  }
+
+  def removeStockFromWatchlist() = Action.async { implicit request: MessagesRequest[AnyContent] =>
+    val optUserId = request.session.get("userId")
+    val values = request.body.asJson
+    // if no ID provided: stocks will not be modified
+    val id = optUserId.map(userId => userId.toInt).getOrElse(Future.successful(Ok(Json.toJson(false))))
+    values.map(vals => {
+      Json.fromJson[Int](vals) match {
+        case JsSuccess(stock, path) => {
+          model.removeStockFromWatchlist(stock)
+            .map(insertCount =>
+              Ok(Json.toJson(insertCount > 0))
+            )
+        }
+        case e @ JsError(_) =>
+          Future.successful(Redirect(routes.AuthenticationController.index()))
+      }
+    }
+    ).getOrElse(Future.successful(Ok(Json.toJson(Json.obj("error" -> "Removing stock from watchlist failed.")))))
   }
 
 }

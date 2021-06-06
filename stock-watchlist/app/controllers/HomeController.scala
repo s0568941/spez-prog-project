@@ -12,6 +12,10 @@ import play.api.mvc._
  */
 @Singleton
 class HomeController @Inject()(val controllerComponents: MessagesControllerComponents) extends MessagesBaseController {
+  val registerForm = Form(mapping(
+    "Username" -> text(3, 20),
+    "Password" -> text(5),
+    "Confirm Password" -> text(5))(Register.apply)(Register.unapply))
 
   /**
    * Create an Action to render an HTML page.
@@ -20,14 +24,12 @@ class HomeController @Inject()(val controllerComponents: MessagesControllerCompo
    * will be called when the application receives a `GET` request with
    * a path of `/`.
    */
+
   def index() = Action { implicit request: MessagesRequest[AnyContent] =>
-    // if session exists and user is logged in -> show "Welcome user"
-    // else: show login page
-//    val values = request.body.asFormUrlEncoded
-    val authError = request.session.get("error")
-    authError.map(e => {
-      Redirect(routes.AuthenticationController.index).flashing("error" -> e).withNewSession
-    }).getOrElse(Redirect(routes.AuthenticationController.index))
-//    Redirect(routes.AuthenticationController.index)
+//    val user = request.session.get("username")
+//    user.map(u => {
+//      Ok(views.html.index(registerForm, u))
+//    }).getOrElse(Ok(views.html.index(registerForm)))
+    Ok(views.html.index(registerForm))
   }
 }

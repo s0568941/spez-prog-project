@@ -1,5 +1,8 @@
 package models
 
+/**
+ * Generates slick code for local DB
+ */
 object CodeGen extends App {
   slick.codegen.SourceCodeGenerator.run(
     "slick.jdbc.PostgresProfile",
