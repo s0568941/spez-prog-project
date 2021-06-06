@@ -1,17 +1,36 @@
-@(user: String)(implicit request: MessagesRequestHeader, flash: Flash)
+@(registerForm: Form[Register], user: String = "")(implicit flash: Flash, request: MessagesRequestHeader)
 
-@main("Stock Watchlist - Login") {
-  <h1>Welcome to Your Stock Watchlist!</h1>
+@main("Stock Watchlist") {
 
-  <h3>Hello @user!</h3>
-  <a href="@routes.AuthenticationController.logout()">Logout</a>
-@*  <form method="POST" action="@routes.AuthenticationController.validateLogin()">*@
-@*    @helper.CSRF.formField*@
-@*    <span>Username:</span>*@
-@*    <input type="text" name="username"></input><br>*@
-@*    <span>Password:</span>*@
-@*    <input type="password" name="password"></input><br>*@
-@*    <input type="submit"></input>*@
-@*    <hr>*@
-@*  </form>*@
+  <div id="root"></div>
+
+  <input type="hidden" id="indexRoute" value="@routes.HomeController.index">
+  @*  Welcome / login*@
+  <input type="hidden" id="welcomeRoute" value="@routes.AuthenticationController.index()">
+  <input type="hidden" id="validateLoginRoute" value="@routes.AuthenticationDBController.validateLogin()">
+  <input type="hidden" id="validateRegisterRoute" value="@routes.AuthenticationDBController.validateRegisterForm">
+  <input type="hidden" id="authStatusRoute" value="@routes.AuthenticationController.authStatus">
+  <input type="hidden" id="loadAppDataRoute" value="@routes.AuthenticationDBController.loadAppData">
+  <input type="hidden" id="loadWatchlistRoute" value="@routes.AuthenticationDBController.loadWatchlist">
+  <input type="hidden" id="receiveTodaysNewsRoute" value="@routes.AuthenticationDBController.receiveTodaysNews">
+  <input type="hidden" id="saveTodaysNewsRoute" value="@routes.AuthenticationDBController.saveTodaysNews">
+  <input type="hidden" id="addToWatchlistRoute" value="@routes.AuthenticationDBController.addStockToWatchlist">
+  <input type="hidden" id="removeFromWatchlistRoute" value="@routes.AuthenticationDBController.removeStockFromWatchlist">
+  <input type="hidden" id="csrfToken" value="@helper.CSRF.getToken.value">
+
+
+
+
+  <script src="@routes.Assets.versioned("javascripts/ResultComponent.js")" type="text/babel"></script>
+  <script src="@routes.Assets.versioned("javascripts/WatchlistComponent.js")" type="text/babel"></script>
+  <script src="@routes.Assets.versioned("javascripts/StockLogoComponent.js")" type="text/babel"></script>
+  <script src="@routes.Assets.versioned("javascripts/StockControlsComponent.js")" type="text/babel"></script>
+  <script src="@routes.Assets.versioned("javascripts/NewsComponent.js")" type="text/babel"></script>
+  <script src="@routes.Assets.versioned("javascripts/AddComponent.js")" type="text/babel"></script>
+  <script src="@routes.Assets.versioned("javascripts/HeaderComponent.js")" type="text/babel"></script>
+  <script src="@routes.Assets.versioned("javascripts/RegisterArea.js")" type="text/babel"></script>
+  <script src="@routes.Assets.versioned("javascripts/LoginArea.js")" type="text/babel"></script>
+
+  <script src="@routes.Assets.versioned("javascripts/react.js")" type="text/babel"></script>
+
 }
