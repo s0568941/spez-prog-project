@@ -19,3 +19,7 @@ Run following commands with connection to your postgres DB:<br>
  `\copy news FROM 'news_table.csv' delimiter '^';`<br>
 
 The reason behind this is, that the news API does not allow fetch requests which come from the browser (e.g. from Heroku), unless a premium account is used. Therefore, the data has been fetched via localhost and persisted in the database.<br>
+
+# View it on Heroku
+
+Go to: http://sprog-stock-watchlist.herokuapp.com/
